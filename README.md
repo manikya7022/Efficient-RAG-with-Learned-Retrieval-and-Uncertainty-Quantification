@@ -234,6 +234,46 @@ Reduce batch size:
 docker-compose run --rm rag_uq python experiments/run_router_training.py --batch-size 8 --synthetic
 ```
 
-## License
+## File Descriptions
 
-MIT License - see [LICENSE](LICENSE) file.
+### Core Library (`rag_uq/`)
+
+| File | Description |
+|------|-------------|
+| `router.py` | Implements the `RetrievalRouter` class - a lightweight MLP that learns to weight BM25 vs dense retrieval scores. Includes `ApproxNDCGLoss` for listwise ranking optimization and `RouterTrainer` for the training loop with checkpointing. |
+| `confidence.py` | Contains `MCDropoutConfidence` for uncertainty estimation via multiple LLM samples with embedding variance, and `ConformalRAG` for frequentist coverage guarantees using ROUGE-L nonconformity scores. |
+| `streaming_index.py` | Implements `BM25Index` for sparse retrieval, `DenseIndex` using ChromaDB with Ollama embeddings, and `HybridRetriever` that combines both. Supports incremental indexing via `StreamingIndex`. |
+| `eval_protocol.py` | Contains `RAGEvaluator` with metrics for retrieval (Recall@K, MRR, NDCG), generation (Exact Match, F1, ROUGE-L), calibration (ECE, MCE, Brier Score), and efficiency (latency, throughput). Includes reliability diagram plotting. |
+
+### Data Pipeline (`data/preprocessing/`)
+
+| File | Description |
+|------|-------------|
+| `prepare_corpus.py` | Downloads Wikipedia articles via API with rate limiting, chunks text into overlapping passages, and prepares Natural Questions dataset from HuggingFace. Supports checkpointing for resumable downloads. |
+| `build_chroma_index.py` | Builds both ChromaDB (dense) and BM25 (sparse) indices from JSONL corpus files. Includes batch processing and index verification with sample queries. |
+| `verify_dataset.py` | Validates JSONL datasets by computing statistics (document count, field distribution, text lengths) and checking for duplicate IDs. Generates human-readable reports. |
+
+### Experiment Scripts (`experiments/`)
+
+| File | Description |
+|------|-------------|
+| `run_router_training.py` | Loads NQ dataset, retrieves passages using hybrid retrieval, generates pseudo-relevance labels based on answer overlap, and trains the router using ApproxNDCG loss. Supports synthetic data mode for quick testing. |
+| `run_calibration.py` | Runs conformal calibration by generating LLM predictions on held-out samples, computing ROUGE-L nonconformity scores against true answers, and persisting calibration data to SQLite. |
+| `run_evaluation.py` | Orchestrates full RAG evaluation: performs hybrid retrieval, generates answers with LLM, computes all metrics, and produces reliability diagrams and routing analysis plots. |
+
+### Setup Scripts (`scripts/`)
+
+| File | Description |
+|------|-------------|
+| `setup.sh` | Shell script that checks Docker installation, creates directories, starts Ollama/ChromaDB services, pulls LLM models, and builds the application container. |
+| `run_experiment.sh` | Automated pipeline runner that executes corpus preparation, index building, router training, calibration, and evaluation. Supports `--quick` mode for reduced samples. |
+| `download_models.py` | Pre-downloads sentence-transformers models and NLTK data for offline use during Docker image build. |
+
+### Configuration Files
+
+| File | Description |
+|------|-------------|
+| `docker-compose.yml` | Defines three Docker services: `rag_uq` (application), `ollama` (LLM inference on port 11434), and `chromadb` (vector store on port 8000). |
+| `Dockerfile` | Python 3.11 container with ML dependencies, copies project files, creates data directories, and pre-downloads the sentence-transformers embedding model. |
+| `requirements.txt` | Python dependencies including PyTorch, transformers, ChromaDB, rank-bm25, ollama, rouge-score, and testing libraries. |
+| `pyproject.toml` | Modern Python project configuration with metadata, dependencies, and tool settings for black, isort, and mypy. |
