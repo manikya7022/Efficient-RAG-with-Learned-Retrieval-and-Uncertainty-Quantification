@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag_uq"
+version = "0.1.0"
+description = "Efficient RAG with Learned Retrieval and Uncertainty Quantification"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = [
+    "rag",
+    "retrieval-augmented-generation",
+    "uncertainty-quantification",
+    "llm",
+    "machine-learning"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "sentence-transformers>=2.2.0",
+    "chromadb>=0.4.0",
+    "rank-bm25>=0.2.2",
+    "ollama>=0.1.0",
+    "langchain>=0.1.0",
+    "datasets>=2.12.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0",
+    "rouge-score>=0.1.2",
+    "matplotlib>=3.5.0",
+    "tqdm>=4.65.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/rag_uq"
+Documentation = "https://github.com/yourusername/rag_uq#readme"
+Repository = "https://github.com/yourusername/rag_uq"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rag_uq*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

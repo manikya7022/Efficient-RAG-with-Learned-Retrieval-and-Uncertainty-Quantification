@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  rag_uq:
+    build: .
+    container_name: rag_phd
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./rag_uq:/app/rag_uq
+      - ./experiments:/app/experiments
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - PYTHONPATH=/app
+    depends_on:
+      - ollama
+      - chromadb
+    stdin_open: true
+    tty: true
+    networks:
+      - rag_network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_phd
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    networks:
+      - rag_network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb_phd
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=false
+    networks:
+      - rag_network
+
+volumes:
+  ollama_models:
+  chroma_data:
+
+networks:
+  rag_network:
+    driver: bridge

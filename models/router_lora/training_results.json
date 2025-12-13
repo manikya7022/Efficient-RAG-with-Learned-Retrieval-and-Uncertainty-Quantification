@@ -1,0 +1,8 @@
+{
+  "type": "synthetic",
+  "train_samples": 400,
+  "val_samples": 100,
+  "final_train_loss": -0.328091935469554,
+  "final_val_loss": -0.33511993288993835,
+  "model_path": "models/router_lora/synthetic_router.pt"
+}
