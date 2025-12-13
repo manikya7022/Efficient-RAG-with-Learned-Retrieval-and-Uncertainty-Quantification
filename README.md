@@ -1,215 +1,186 @@
 # Efficient RAG with Learned Retrieval and Uncertainty Quantification
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A research implementation combining differentiable retrieval gating with Bayesian uncertainty calibration for retrieval-augmented generation (RAG).
 
-A PhD-level research implementation combining **differentiable retrieval gating** with **Bayesian uncertainty calibration** for retrieval-augmented generation (RAG).
+## Overview
 
-## 🎯 Research Contributions
+This project implements:
+- **Differentiable Retrieval Gating Network**: A learned MLP router that dynamically weights BM25 vs. dense retrieval scores per passage
+- **Bayesian Confidence Calibration**: MC Dropout + Conformal Prediction for uncertainty quantification
+- **Hybrid Retrieval System**: Combined BM25 (sparse) and ChromaDB (dense) retrieval with learned fusion
 
-1. **Differentiable Retrieval Gating Network**: Learned MLP router that dynamically weights BM25 vs. dense retrieval scores per passage
-2. **Bayesian Confidence Calibration**: MC Dropout + Conformal Prediction hybrid for uncertainty quantification
-3. **First UQ Framework for RAG**: Theoretical foundation for uncertainty in retrieval-augmented systems
+## Prerequisites
 
-## 🏗️ Architecture
-
-```
-┌─────────┐     ┌──────────────────────────────────────┐
-│  Query  │────▶│           Hybrid Retrieval           │
-└─────────┘     │  ┌─────────┐       ┌──────────────┐ │
-                │  │  BM25   │──┐ ┌──│ ChromaDB     │ │
-                │  └─────────┘  │ │  │ (Dense)      │ │
-                │               ▼ ▼  └──────────────┘ │
-                │         ┌──────────────┐            │
-                │         │Learned Router │            │
-                │         │  (0.5M params)│            │
-                │         └──────┬───────┘            │
-                └────────────────┼────────────────────┘
-                                 ▼
-                    ┌────────────────────────┐
-                    │   LLM (Llama 3.2 3B)   │
-                    │   + MC Dropout UQ      │
-                    └───────────┬────────────┘
-                                ▼
-                    ┌────────────────────────┐
-                    │  Conformal Prediction  │
-                    │  (Coverage Guarantee)  │
-                    └───────────┬────────────┘
-                                ▼
-                    ┌────────────────────────┐
-                    │  Answer + Confidence   │
-                    │  Interval              │
-                    └────────────────────────┘
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Docker & Docker Compose
+- Docker and Docker Compose (v2.0+)
 - 8GB RAM minimum (16GB recommended)
-- ~10GB disk space
+- 10GB disk space
 
-### Setup
+Verify Docker is installed:
+```bash
+docker --version
+docker compose version
+```
+
+## Installation
+
+### 1. Clone the Repository
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/rag_uq.git
-cd rag_uq
+git clone https://github.com/manikya7022/Efficient-RAG-with-Learned-Retrieval-and-Uncertainty-Quantification.git
+cd Efficient-RAG-with-Learned-Retrieval-and-Uncertainty-Quantification
+```
 
-# Run setup script
+### 2. Start Docker
+
+```bash
+# macOS
+open -a Docker
+
+# Linux
+sudo systemctl start docker
+```
+
+### 3. Run Setup
+
+```bash
 chmod +x scripts/setup.sh
 ./scripts/setup.sh
 ```
 
-### Run Full Experiment
+This will:
+- Create necessary directories
+- Start Ollama and ChromaDB services
+- Pull required LLM models (llama3.2:3b, nomic-embed-text)
+- Build the application Docker image
+
+### 4. Verify Installation
 
 ```bash
-# Full experiment (~4 hours on CPU)
+docker ps
+```
+
+You should see three containers running: `rag_phd`, `chromadb_phd`, and `ollama_phd`.
+
+## Running Experiments
+
+### Quick Start (Automated Pipeline)
+
+Run the complete experiment with a single command:
+
+```bash
+# Full experiment (2-4 hours)
 docker-compose run --rm rag_uq bash scripts/run_experiment.sh
 
-# Quick test (~30 minutes)
+# Quick test mode (30 minutes)
 docker-compose run --rm rag_uq bash scripts/run_experiment.sh --quick
 ```
 
 ### Manual Steps
 
+#### Step 1: Prepare Corpus
+
+Download Wikipedia articles and chunk into passages:
+
 ```bash
-# 1. Prepare corpus
-docker-compose run --rm rag_uq python data/preprocessing/prepare_corpus.py --n-articles 1000
-
-# 2. Build index
-docker-compose run --rm rag_uq python data/preprocessing/build_chroma_index.py
-
-# 3. Train router
-docker-compose run --rm rag_uq python experiments/run_router_training.py --epochs 50
-
-# 4. Run calibration
-docker-compose run --rm rag_uq python experiments/run_calibration.py --n-samples 500
-
-# 5. Evaluate
-docker-compose run --rm rag_uq python experiments/run_evaluation.py
+docker-compose run --rm rag_uq python data/preprocessing/prepare_corpus.py \
+    --task all \
+    --n-articles 100 \
+    --n-nq 500 \
+    --output-dir data
 ```
 
-## 📁 Project Structure
+#### Step 2: Build Index
+
+Create BM25 and ChromaDB indices:
+
+```bash
+docker-compose run --rm rag_uq python data/preprocessing/build_chroma_index.py \
+    --corpus-path data/preprocessed/wikipedia_100k.jsonl \
+    --batch-size 100
+```
+
+#### Step 3: Train Router
+
+Train the learned routing network:
+
+```bash
+# With real data
+docker-compose run --rm rag_uq python experiments/run_router_training.py \
+    --nq-path data/preprocessed/nq_dev_3000.jsonl \
+    --epochs 50 \
+    --batch-size 16
+
+# With synthetic data (for testing)
+docker-compose run --rm rag_uq python experiments/run_router_training.py --synthetic
+```
+
+#### Step 4: Run Calibration
+
+Build calibration set for uncertainty quantification:
+
+```bash
+docker-compose run --rm rag_uq python experiments/run_calibration.py \
+    --nq-path data/preprocessed/nq_dev_3000.jsonl \
+    --n-samples 500
+```
+
+#### Step 5: Run Evaluation
+
+Execute full evaluation:
+
+```bash
+docker-compose run --rm rag_uq python experiments/run_evaluation.py \
+    --nq-path data/preprocessed/nq_dev_3000.jsonl \
+    --router-path models/router_lora/best_router.pt \
+    --output-dir results
+```
+
+## Project Structure
 
 ```
-rag_uq/
-├── rag_uq/                    # Core library
-│   ├── router.py              # Learned retrieval selector
-│   ├── confidence.py          # MC Dropout + Conformal Prediction
-│   ├── streaming_index.py     # Hybrid ChromaDB + BM25 retrieval
-│   └── eval_protocol.py       # Calibrated evaluation metrics
+├── rag_uq/                     # Core library
+│   ├── router.py               # Learned retrieval router
+│   ├── confidence.py           # MC Dropout + Conformal Prediction
+│   ├── streaming_index.py      # Hybrid retrieval (BM25 + ChromaDB)
+│   └── eval_protocol.py        # Evaluation metrics
 ├── data/
-│   ├── preprocessing/         # Data pipeline scripts
-│   ├── preprocessed/          # Processed datasets
-│   └── raw/                   # Downloaded data
+│   ├── preprocessing/          # Data pipeline scripts
+│   └── preprocessed/           # Processed datasets
 ├── experiments/
-│   ├── run_router_training.py # Router training
-│   ├── run_calibration.py     # Conformal calibration
-│   └── run_evaluation.py      # Full evaluation
-├── models/
-│   └── router_lora/           # Trained router checkpoints
-├── results/                   # Evaluation outputs
-├── scripts/                   # Setup and run scripts
+│   ├── run_router_training.py  # Router training
+│   ├── run_calibration.py      # Conformal calibration
+│   └── run_evaluation.py       # Evaluation pipeline
+├── models/router_lora/         # Trained model checkpoints
+├── results/                    # Evaluation outputs
+├── scripts/
+│   ├── setup.sh                # Environment setup
+│   └── run_experiment.sh       # Pipeline runner
 ├── docker-compose.yml
 ├── Dockerfile
 └── requirements.txt
 ```
 
-## 📊 Components
+## Output Files
 
-### Retrieval Router
+After running experiments, results are stored in:
 
-The router is a lightweight MLP (~0.5M parameters) that learns to weight retrieval scores:
+| Location | Contents |
+|----------|----------|
+| `models/router_lora/best_router.pt` | Trained router checkpoint |
+| `models/router_lora/training_results.json` | Training metrics |
+| `results/evaluation_results.json` | Evaluation metrics |
+| `results/reliability_diagram.png` | Calibration plot |
+| `data/preprocessed/` | Processed datasets |
 
-```python
-from rag_uq import RetrievalRouter, RouterConfig
-
-router = RetrievalRouter(RouterConfig(hidden_dim=64))
-weights = router(bm25_scores, dense_scores)  # [0, 1] per passage
-hybrid_scores = weights * dense_scores + (1 - weights) * bm25_scores
-```
-
-### Uncertainty Quantification
-
-Two-phase uncertainty estimation:
-
-```python
-from rag_uq import MCDropoutConfidence, ConformalRAG
-
-# Phase 1: MC Dropout
-mc = MCDropoutConfidence(llm_client, n_samples=10)
-result = mc.get_confidence_interval(prompt, context, question)
-print(f"Uncertainty: {result.uncertainty_score}")
-
-# Phase 2: Conformal Prediction
-conformal = ConformalRAG(llm_client, alpha=0.1)
-conformal.calibrate(questions, contexts, answers)
-result = conformal.predict_with_coverage(question, context)
-print(f"Reliable: {result.is_reliable}, Coverage: {1 - result.coverage_alpha}")
-```
-
-### Evaluation Metrics
-
-Comprehensive evaluation across four dimensions:
-
-| Category | Metrics |
-|----------|---------|
-| **Retrieval** | Recall@K, MRR, NDCG@10, Router Accuracy |
-| **Generation** | Exact Match, Token F1, ROUGE-L |
-| **Calibration** | ECE, MCE, Brier Score, Reliability Diagram |
-| **Efficiency** | Latency (avg/p95/p99), Throughput |
-
-## 🧪 Experiments
-
-### Router Training
-
-Uses ApproxNDCG listwise ranking loss for end-to-end optimization:
-
-```bash
-python experiments/run_router_training.py \
-    --nq-path data/preprocessed/nq_dev_3000.jsonl \
-    --epochs 50 \
-    --batch-size 16
-```
-
-### Conformal Calibration
-
-Builds calibration set for coverage guarantees:
-
-```bash
-python experiments/run_calibration.py \
-    --n-samples 500 \
-    --model llama3.2:3b
-```
-
-## 📈 Results
-
-Example results on Natural Questions (3K dev set):
-
-| Method | EM | F1 | ECE | Avg Latency |
-|--------|----|----|-----|-------------|
-| BM25 only | 0.32 | 0.45 | 0.18 | 120ms |
-| Dense only | 0.35 | 0.48 | 0.15 | 180ms |
-| Learned Router | **0.38** | **0.52** | **0.08** | 145ms |
-
-## 📚 Theory
-
-See [docs/uncertainty_theory.md](docs/uncertainty_theory.md) for:
-- Bayesian foundations of MC Dropout
-- Conformal prediction coverage guarantees
-- Analysis of retrieval uncertainty propagation
-
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OLLAMA_BASE_URL` | Ollama API endpoint | `http://ollama:11434` |
-| `CHROMA_HOST` | ChromaDB host | `chromadb` |
-| `CHROMA_PORT` | ChromaDB port | `8000` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_BASE_URL` | `http://ollama:11434` | Ollama API endpoint |
+| `CHROMA_HOST` | `chromadb` | ChromaDB host |
+| `CHROMA_PORT` | `8000` | ChromaDB port |
 
 ### Router Hyperparameters
 
@@ -222,31 +193,47 @@ RouterConfig(
 )
 ```
 
-## 🤝 Contributing
+## Running Tests
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 Citation
-
-```bibtex
-@article{yourname2024raguq,
-  title={Efficient RAG with Learned Retrieval and Uncertainty Quantification},
-  author={Your Name},
-  journal={arXiv preprint arXiv:2024.xxxxx},
-  year={2024}
-}
+```bash
+docker-compose run --rm rag_uq pytest tests/ -v
 ```
 
-## 📜 License
+## Stopping Services
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+# Stop containers
+docker-compose down
 
-## 🙏 Acknowledgments
+# Stop and remove volumes
+docker-compose down -v
+```
 
-- [Ollama](https://ollama.ai/) for local LLM inference
-- [ChromaDB](https://www.trychroma.com/) for vector storage
-- [Natural Questions](https://ai.google.com/research/NaturalQuestions) dataset
+## Troubleshooting
+
+### Ollama Connection Failed
+
+```bash
+docker logs ollama_phd
+docker-compose restart ollama
+docker exec ollama_phd ollama pull llama3.2:3b
+```
+
+### ChromaDB Connection Failed
+
+```bash
+docker logs chromadb_phd
+docker-compose restart chromadb
+curl http://localhost:8000/api/v2/heartbeat
+```
+
+### Memory Issues
+
+Reduce batch size:
+```bash
+docker-compose run --rm rag_uq python experiments/run_router_training.py --batch-size 8 --synthetic
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
